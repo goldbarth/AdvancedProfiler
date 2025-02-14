@@ -49,12 +49,19 @@ namespace Tools.Editor
         {
             base.OnEnable();
             ProfilingSettings.Initialize();
+            EditorApplication.update += OnEditorUpdate;
         }
         
         protected override void OnDestroy()
         {
             base.OnDestroy();
             ProfilingSettings.Dispose();
+            EditorApplication.update -= OnEditorUpdate;
+        }
+        
+        private void OnEditorUpdate()
+        {
+            Repaint();
         }
     }
 }
