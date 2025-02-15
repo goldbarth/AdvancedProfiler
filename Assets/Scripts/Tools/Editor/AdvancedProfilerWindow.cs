@@ -4,6 +4,7 @@ using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities;
 using Sirenix.Utilities.Editor;
 using Tools.SerializedSettings;
+using Tools.SerializedSettings.Base;
 using UnityEditor;
 using UnityEngine;
 
@@ -27,6 +28,8 @@ namespace Tools.Editor
             window.Show();
         }
         
+        private ISettings _settings;
+        
         [TabGroup("Profiling")]
         [Title("Profiling Settings", "Configure the Profiling settings for the Advanced Profiler", TitleAlignments.Centered)]
         [InlineProperty]
@@ -37,25 +40,30 @@ namespace Tools.Editor
         [Title("Network Settings", "Configure the Network settings for the Advanced Profiler", TitleAlignments.Centered)]
         [InlineProperty]
         [HideLabel]
-        public NetworkSettings NetworkSettings;
+        public NetworkSettings NetworkSettings = new NetworkSettings();
         
         [TabGroup("Logs")]
         [Title("Log Settings", "Configure the Log settings for the Advanced Profiler", TitleAlignments.Centered)]
         [InlineProperty]
         [HideLabel]
-        public LogSettings LogSettings;
+        public LogSettings LogSettings = new LogSettings();
         
         protected override void OnEnable()
         {
             base.OnEnable();
-            ProfilingSettings.Initialize();
+            _settings = new CompositeSettings(
+                ProfilingSettings, 
+                NetworkSettings, 
+                LogSettings
+                );
+            _settings.Initialize();
             EditorApplication.update += OnEditorUpdate;
         }
         
         protected override void OnDestroy()
         {
             base.OnDestroy();
-            ProfilingSettings.Dispose();
+            _settings.Dispose();
             EditorApplication.update -= OnEditorUpdate;
         }
         

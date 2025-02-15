@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Sirenix.OdinInspector;
+using Tools.SerializedSettings.Base;
 using Tools.Utils;
-using UnityEditor;
 using UnityEngine;
 
 #if UNITY_2022_1_OR_NEWER
@@ -46,19 +46,21 @@ namespace Tools.SerializedSettings
         private bool _displayCPU;
         private bool _displayMemory;
         
-        private bool _isAnyGraphVisible => _displayFPS || _displayCPU || _displayMemory;
-        
-        public void Initialize()
+        private bool IsAnyGraphVisible => _displayFPS || _displayCPU || _displayMemory;
+
+        #region Event Handlers
+
+        public override void Initialize()
         {
-            EditorApplication.update += Update;
+            base.Initialize();
             ManageCpuProfiler(RecorderCommand.Start);
             GetTotalSystemMemory();
             Debug.Log("ProfilingSettings initialized.");
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            EditorApplication.update -= Update;
+            base.Dispose();
             ManageCpuProfiler(RecorderCommand.Stop);
             Debug.Log("ProfilingSettings disposed.");
         }
@@ -83,7 +85,7 @@ namespace Tools.SerializedSettings
 #endif
         }
 
-        private void Update()
+        protected override void Update()
         {
 #if UNITY_2022_1_OR_NEWER
             // Update CPU value
@@ -125,16 +127,7 @@ namespace Tools.SerializedSettings
             _averageMemoryUsage = _memoryHistory.Average();
         }
         
-        private void TrimQueue(Queue<float> queue, int maxCapacity)
-        {
-            while(queue.Count > maxCapacity)
-            {
-                queue.Dequeue();
-            }
-        }
-
-        
-        #region Editor Exposure
+        #endregion
 
         #region Buttons
         
@@ -171,9 +164,11 @@ namespace Tools.SerializedSettings
         }
         
         #endregion
+
+        #region History Capacity
         
         [PropertyOrder(6)]
-        [ShowIf("_isAnyGraphVisible")]
+        [ShowIf("IsAnyGraphVisible")]
         [BoxGroup("Metrics")]
         [LabelText("History Capacity")]
         [ShowInInspector]
@@ -191,6 +186,8 @@ namespace Tools.SerializedSettings
                 TrimQueue(_memoryHistory, _historyCapacity);
             }
         }
+        
+        #endregion
         
         #region FPS Graph
         
@@ -227,37 +224,8 @@ namespace Tools.SerializedSettings
         private void DrawFpsGraph()
         {
             var rect = GUILayoutUtility.GetRect(100, 100);
-            EditorGUI.DrawRect(rect, new Color(0.12f, 0.12f, 0.12f));
-
-            if (Event.current.type == EventType.Repaint)
-            {
-                Handles.BeginGUI();
-                Handles.color = Color.cyan;
-        
-                var count = _fpsHistory.Count;
-                if (count < 2)
-                {
-                    Handles.EndGUI();
-                    return;
-                }
-                
-                var maxFps = Mathf.Max(60f, _fpsHistory.Max());
-                var points = new Vector3[count];
-                var fpsArray = _fpsHistory.ToArray();
-
-                for (int i = 0; i < count; i++)
-                {
-                    var normalizedFps = Mathf.Clamp01(fpsArray[i] / maxFps);
-                    var x = rect.x + (rect.width / (count - 1)) * i;
-                    var y = rect.y + rect.height * (1 - normalizedFps);
-                    points[i] = new Vector3(x, y, 0);
-                }
-                
-                Handles.DrawAAPolyLine(2, points);
-                Handles.EndGUI();
-                
-                DrawGuideLines(rect);
-            }
+            var maxFps = Mathf.Max(60f, _fpsHistory.Max());
+            DrawGraph(_fpsHistory, rect, Color.cyan, maxFps, fps => fps);
         }
         
         #endregion
@@ -298,38 +266,8 @@ namespace Tools.SerializedSettings
         private void DrawCpuGraph()
         {
             var rect = GUILayoutUtility.GetRect(100, 100);
-            var backgroundColor = new Color(0.12f, 0.12f, 0.12f);
-            EditorGUI.DrawRect(rect, backgroundColor);
-            
-            if (Event.current.type == EventType.Repaint)
-            {
-                Handles.BeginGUI();
-                Handles.color = Color.green;
-                var count = _cpuHistory.Count;
-                if (count < 2)
-                {
-                    Handles.EndGUI();
-                    return;
-                }
-                
-                var maxCpu = Mathf.Max(16.6f, _cpuHistory.Max());
-
-                var points = new Vector3[count];
-                var historyArray = _cpuHistory.ToArray();
-
-                for (int i = 0; i < count; i++)
-                {
-                    var normalizedValue = Mathf.Clamp01(historyArray[i] / maxCpu);
-                    var x = rect.x + (rect.width / (count - 1)) * i;
-                    var y = rect.y + rect.height * (1 - normalizedValue);
-                    points[i] = new Vector3(x, y, 0);
-                }
-                
-                Handles.DrawAAPolyLine(2, points);
-                Handles.EndGUI();
-                
-                DrawGuideLines(rect);
-            }
+            var maxCpu = Mathf.Max(16.6f, _cpuHistory.Max());
+            DrawGraph(_cpuHistory, rect, Color.green, maxCpu, cpu => cpu);
         }
         
         #endregion
@@ -364,66 +302,8 @@ namespace Tools.SerializedSettings
         private void DrawMemoryGraph()
         {
             var rect = GUILayoutUtility.GetRect(100, 100);
-            EditorGUI.DrawRect(rect, new Color(0.12f, 0.12f, 0.12f));
-        
-            if (Event.current.type == EventType.Repaint)
-            {
-                Handles.BeginGUI();
-                Handles.color = Color.magenta;
-        
-                var count = _memoryHistory.Count;
-                if (count < 2)
-                {
-                    Handles.EndGUI();
-                    return;
-                }
-
-                var maxMemory = _totalSystemMemory;
-                var points = new Vector3[count];
-                var memoryArray = _memoryHistory.ToArray();
-        
-                for (int i = 0; i < count; i++)
-                {
-                    var normalizedValue = Mathf.Clamp01(memoryArray[i] / maxMemory);
-                    var x = rect.x + (rect.width / (count - 1)) * i;
-                    var y = rect.y + rect.height * (1 - normalizedValue);
-                    points[i] = new Vector3(x, y, 0);
-                }
-        
-                Handles.DrawAAPolyLine(2, points);
-                Handles.EndGUI();
-        
-                DrawGuideLines(rect);
-            }
+            DrawGraph(_memoryHistory, rect, Color.magenta, _totalSystemMemory, mem => mem);
         }
-        
-        #endregion
-
-        #region Graph Utils
-
-        private void DrawGuideLines(Rect rect)
-        {
-            // 100%
-            Handles.color = Color.red;
-            Handles.DrawLine(new Vector3(rect.x, rect.y, 0), new Vector3(rect.x + rect.width, rect.y, 0));
-    
-            // 75%
-            Handles.color = new Color(1f, 0.5f, 0f);
-            float y75 = rect.y + rect.height * 0.25f;
-            Handles.DrawLine(new Vector3(rect.x, y75, 0), new Vector3(rect.x + rect.width, y75, 0));
-    
-            // 50%
-            Handles.color = Color.green;
-            float y50 = rect.y + rect.height * 0.5f;
-            Handles.DrawLine(new Vector3(rect.x, y50, 0), new Vector3(rect.x + rect.width, y50, 0));
-    
-            // 25%
-            Handles.color = Color.yellow;
-            float y25 = rect.y + rect.height * 0.75f;
-            Handles.DrawLine(new Vector3(rect.x, y25, 0), new Vector3(rect.x + rect.width, y25, 0));
-        }
-
-        #endregion
         
         #endregion
         
