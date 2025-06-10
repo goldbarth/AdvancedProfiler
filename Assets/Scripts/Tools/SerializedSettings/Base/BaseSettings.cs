@@ -85,6 +85,7 @@ namespace Tools.SerializedSettings.Base
         
         protected virtual void DrawGuideLines(Rect rect)
         {
+            Handles.BeginGUI();
             // 100%
             Handles.color = Color.red;
             Handles.DrawLine(new Vector3(rect.x, rect.y, 0), new Vector3(rect.x + rect.width, rect.y, 0));
@@ -103,6 +104,7 @@ namespace Tools.SerializedSettings.Base
             Handles.color = Color.yellow;
             float y25 = rect.y + rect.height * 0.75f;
             Handles.DrawLine(new Vector3(rect.x, y25, 0), new Vector3(rect.x + rect.width, y25, 0));
+            Handles.EndGUI();
         }
     }
 }
